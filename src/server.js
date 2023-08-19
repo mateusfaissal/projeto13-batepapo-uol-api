@@ -81,5 +81,41 @@ server.get('/participants', async (req, res) => {
     }
 
 })
+
+server.post('/messages', async (req, res) => {
+    const { to, text, type} = req.body;
+    const { from } = req.headers.user;
+   
+
+    const validateMessages = messagesSchema.validate({ to, text, type}, {abortEarly: false});
+
+    if (validateMessages.error) {
+        const errors = validateMessages.error.details.map(det => det.message)
+        return res.status(422).send(errors)
+    }
+
+    try {
+
+        if (!(await db.collection('participants').findOne({ name: from }))) {
+			return res.status(422).send("This user isn't logged!");
+		}
+
+        await db.collection('messages').insertOne({
+            to,
+            text,
+            type,
+            from,
+            time: dayjs(Date.now()).format('hh:mm:ss'),
+        });
+
+        res.status(201).send("Message successfully sent");
+
+    } catch (err) {
+        res.status(500).send(err.message)
+    }
+
+})
+
+
 const PORT = 5000;
 server.listen(PORT, () => console.log('Server running on PORT 5000'));
