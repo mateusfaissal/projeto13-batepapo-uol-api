@@ -84,7 +84,7 @@ server.get('/participants', async (req, res) => {
 
 server.post('/messages', async (req, res) => {
     const { to, text, type} = req.body;
-    const { from } = req.headers.user;
+    const  from  = req.headers.user;
    
 
     const validateMessages = messagesSchema.validate({ to, text, type}, {abortEarly: false});
@@ -152,6 +152,27 @@ server.get('/messages', async (req, res) => {
         res.status(500).send(err.message)
     }
 })
+
+server.post('/status', async (req, res) => {
+    const user = req.headers.user
+
+    if (!user) return res.status(404).send("Invalid user!")
+
+    try {
+
+       const participant = await db.collection('participants').findOne({name: user});
+
+       if (participant) {
+         await db.collection('participants').updateOne({name: user}, { $set: { lastStatus: Date.now() } })
+         return res.status(200).send("Updated status successfully");
+
+       } else return res.status(404).send("User not found");
+        
+    } catch (err) {
+        res.status(500).send(err.message)
+    }
+})
+
 
 
 
