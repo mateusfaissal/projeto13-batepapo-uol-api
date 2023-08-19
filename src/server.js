@@ -116,6 +116,44 @@ server.post('/messages', async (req, res) => {
 
 })
 
+server.get('/messages', async (req, res) => {
+    const { user } = req.headers
+    const limit = parseInt(req.query.limit);
+    
+    if(isNaN(limit) || limit <= 0) return res.status(422).send("Invalid limit");
+
+    try {
+
+        const messageQuery = {
+            $or: [
+                { to: "Todos" },
+                { to: user },
+                { from: user, }
+            ],
+        };
+
+        let messages; 
+
+        if(limit) {
+          messages = await db
+            .collection('messages')
+            .find(messageQuery)
+            .sort({ _id: -1 })
+            .limit(limit)
+            .toArray();
+        } else {
+           messages = await db.collection("messages").find(queryMessage).toArray();
+        }
+
+        return res.status(200).send(messages);
+
+
+    } catch (err) {
+        res.status(500).send(err.message)
+    }
+})
+
+
 
 const PORT = 5000;
 server.listen(PORT, () => console.log('Server running on PORT 5000'));
