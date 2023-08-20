@@ -35,7 +35,7 @@ const messagesSchema = Joi.object({
 
 server.post('/participants', async (req, res) => {
     const { name } = req.body;
-    const validateUser = particpantsSchema.validate({ name }, {abortEarly: false});
+    const validateUser = particpantsSchema.validate({ name }, { abortEarly: false });
 
     if (validateUser.error) {
         const errors = validateUser.error.details.map(det => det.message)
@@ -44,22 +44,22 @@ server.post('/participants', async (req, res) => {
 
     try {
         const userExists = await db.collection('participants').findOne({ name });
-        if(userExists) return res.status(409).send("This user already exists!")
+        if (userExists) return res.status(409).send("This user already exists!")
 
         await db.collection('participants').insertOne({
-            name, 
+            name,
             lastStatus: Date.now(),
         })
 
         await db.collection('messages').insertOne({
             from: name,
-			to: 'Todos',
-			text: 'entra na sala...',
-			type: 'status',
-			time: dayjs(Date.now()).format('hh:mm:ss'),  
+            to: 'Todos',
+            text: 'entra na sala...',
+            type: 'status',
+            time: dayjs(Date.now()).format('hh:mm:ss'),
         })
 
-        
+
         res.status(201).send("User successfully saved")
 
     } catch (err) {
@@ -83,11 +83,11 @@ server.get('/participants', async (req, res) => {
 })
 
 server.post('/messages', async (req, res) => {
-    const { to, text, type} = req.body;
-    const  from  = req.headers.user;
-   
+    const { to, text, type } = req.body;
+    const from = req.headers.user;
 
-    const validateMessages = messagesSchema.validate({ to, text, type}, {abortEarly: false});
+
+    const validateMessages = messagesSchema.validate({ to, text, type }, { abortEarly: false });
 
     if (validateMessages.error) {
         const errors = validateMessages.error.details.map(det => det.message)
@@ -97,8 +97,8 @@ server.post('/messages', async (req, res) => {
     try {
 
         if (!(await db.collection('participants').findOne({ name: from }))) {
-			return res.status(422).send("This user isn't logged!");
-		}
+            return res.status(422).send("This user isn't logged!");
+        }
 
         await db.collection('messages').insertOne({
             to,
@@ -119,8 +119,8 @@ server.post('/messages', async (req, res) => {
 server.get('/messages', async (req, res) => {
     const { user } = req.headers
     const limit = parseInt(req.query.limit);
-    
-    if(isNaN(limit) || limit <= 0) return res.status(422).send("Invalid limit");
+
+    if (isNaN(limit) || limit <= 0) return res.status(422).send("Invalid limit");
 
     try {
 
@@ -132,17 +132,17 @@ server.get('/messages', async (req, res) => {
             ],
         };
 
-        let messages; 
+        let messages;
 
-        if(limit) {
-          messages = await db
-            .collection('messages')
-            .find(messageQuery)
-            .sort({ _id: -1 })
-            .limit(limit)
-            .toArray();
+        if (limit) {
+            messages = await db
+                .collection('messages')
+                .find(messageQuery)
+                .sort({ _id: -1 })
+                .limit(limit)
+                .toArray();
         } else {
-           messages = await db.collection("messages").find(queryMessage).toArray();
+            messages = await db.collection("messages").find(queryMessage).toArray();
         }
 
         return res.status(200).send(messages);
@@ -160,19 +160,45 @@ server.post('/status', async (req, res) => {
 
     try {
 
-       const participant = await db.collection('participants').findOne({name: user});
+        const participant = await db.collection('participants').findOne({ name: user });
 
-       if (participant) {
-         await db.collection('participants').updateOne({name: user}, { $set: { lastStatus: Date.now() } })
-         return res.status(200).send("Updated status successfully");
+        if (participant) {
+            await db.collection('participants').updateOne({ name: user }, { $set: { lastStatus: Date.now() } })
+            return res.status(200).send("Updated status successfully");
 
-       } else return res.status(404).send("User not found");
-        
+        } else return res.status(404).send("User not found");
+
     } catch (err) {
         res.status(500).send(err.message)
     }
 })
 
+async function handleInactive() {
+     await db
+     .collection('participants')
+     .find()
+     .forEach(async (user) => {
+
+        const inactiveStatus = user.lastStatus + 10000;
+
+        if (Date.now() > inactiveStatus) {
+
+            await db.collection('participants').deleteOne({_id: user._id});
+           
+            const message = {
+                from: user.name,
+                to: "Todos",
+                text: "sai da sala...",
+                type: "status",
+                time: dayjs().format("HH:mm:ss"),
+              };
+
+            await db.collection('messages').insertOne(message);
+        }
+     })
+}
+
+setInterval(handleInactive, 15000);
 
 
 
